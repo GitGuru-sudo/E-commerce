@@ -1,0 +1,76 @@
+CI/CD PIPELINE FLOW
+
+1. Developer pushes code to GitHub main branch
+
+2. GitHub Actions starts automatically
+
+3. Backend Workflow:
+   - SSH into EC2
+   - Pull latest code
+   - Build Docker image
+   - Stop old container
+   - Run new container
+
+4. Backend Health Check:
+   GET /api/health
+
+5. Frontend Workflow:
+   - Vercel auto deploy from GitHub
+
+6. Final Result:
+   Frontend live on Vercel
+   Backend live on EC2 Docker
+
+CI/CD PIPELINE CODE
+
+# GitHub Actions workflow: .github/workflows/deploy.yml
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e
+            cd ~/app || exit 1
+            git pull origin main
+            docker compose down
+            docker compose up -d --build
+          EOF
+
+# Docker Compose backend service: docker-compose.yml
+
+version: "3.9"
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./backend/.env
+    restart: always
+
+# Backend Dockerfile: backend/Dockerfile
+
+FROM node:20-alpine
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm install
+COPY . .
+RUN npm run build
+EXPOSE 5000
+CMD ["npm", "run", "start"]

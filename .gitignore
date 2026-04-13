@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.env.local
+frontend/.env.local
+backend/.env.local
+admin-credentials.txt
+.DS_Store
+.vscode
+*.log
